@@ -61,26 +61,69 @@ const App = () => {
   };
 
   return (
-    <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto', textAlign: 'center', fontFamily: 'sans-serif' }}>
-      <h1>画像→動画一括変換ツール</h1>
+    <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto', fontFamily: '"Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif', color: '#333' }}>
 
+      {/* ヘッダー・案内文 */}
+      <header style={{ textAlign: 'left', marginBottom: '30px', borderBottom: '1px solid #eee', paddingBottom: '20px' }}>
+        <h1 style={{ fontSize: '1.8rem', color: '#fff4f4ff', marginBottom: '10px' }}>🛡 one-frame-video-conv</h1>
+        <div style={{ backgroundColor: '#fff4f4ff', padding: '15px', borderRadius: '8px', borderLeft: '5px solid #ff4d4d', lineHeight: '1.6' }}>
+          <p style={{ margin: 0, fontWeight: 'bold' }}>【開発の背景】</p>
+          <p style={{ margin: '5px 0 0', fontSize: '0.95rem' }}>
+            2025年12月24日、X（旧Twitter）に投稿画像をAIが編集・学習に利用しやすくする機能が追加されました。
+            このツールは、画像を「1秒間の動画」に変換することで、それらの自動処理から作品を守るための一時的な措置として開発されました。
+          </p>
+          <p style={{ margin: '5px 0 0', fontSize: '0.85rem', color: '#666' }}>
+            ※すべての処理はブラウザ上で行われます。画像データがサーバーに送信されることはありません。
+          </p>
+        </div>
+      </header>
+
+      {/* ドラッグ＆ドロップエリア */}
       <div
-        style={{ border: '2px dashed #ccc', padding: '40px', borderRadius: '10px', backgroundColor: '#f9f9f9' }}
-        onDragOver={(e) => e.preventDefault()}
+        style={{
+          border: '3px dashed #1DA1F2',
+          padding: '60px 20px',
+          borderRadius: '15px',
+          backgroundColor: '#f0f9ff',
+          textAlign: 'center',
+          cursor: 'pointer',
+          transition: 'all 0.3s ease'
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.currentTarget.style.backgroundColor = '#e0f2fe';
+        }}
+        onDragLeave={(e) => {
+          e.currentTarget.style.backgroundColor = '#f0f9ff';
+        }}
         onDrop={(e) => {
           e.preventDefault();
+          e.currentTarget.style.backgroundColor = '#f0f9ff';
           const files = e.dataTransfer.files;
-          if (files) {
-            const event = { target: { files } } as any;
-            handleFileUpload(event);
-          }
+          if (files) handleFileUpload({ target: { files } } as any);
         }}
+        onClick={() => document.getElementById('fileInput')?.click()}
       >
-        <p>画像をここにドロップするか、ファイルを選択してください</p>
-        <input title='input_files' type="file" accept="image/*" multiple onChange={handleFileUpload} />
+        <div style={{ fontSize: '3rem', marginBottom: '10px' }}>🖼️ ➡ 🎬</div>
+        <h2 style={{ fontSize: '1.2rem', margin: '10px 0' }}>ここに画像をドラッグ＆ドロップ</h2>
+        <p style={{ color: '#666', fontSize: '0.9rem' }}>またはクリックしてファイルを選択（複数可）</p>
+        <input
+          id="fileInput"
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handleFileUpload}
+          style={{ display: 'none' }}
+        />
       </div>
 
-      {isProcessing && <p style={{ color: 'blue' }}>変換中...</p>}
+      {/* 変換中表示 */}
+      {isProcessing && (
+        <div style={{ marginTop: '20px', textAlign: 'center' }}>
+          <div className="loader"></div>
+          <p style={{ color: '#1DA1F2', fontWeight: 'bold' }}>動画に変換中...</p>
+        </div>
+      )}
 
       <div style={{ marginTop: '30px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '20px' }}>
         {videos.map((v) => (
