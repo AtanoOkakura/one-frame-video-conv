@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
 
 // 変換された動画データを管理する型
 interface ConvertedVideo {
@@ -21,12 +22,98 @@ const App = () => {
 
     // 各ファイルを順番に処理
     for (const file of Array.from(files)) {
-      const video = await convertImageToVideo(file);
+      const video = await convertImageToMP4(file);
       newVideos.push(video);
     }
 
     setVideos((prev) => [...newVideos, ...prev]);
     setIsProcessing(false);
+  };
+
+  const convertImageToMP4 = async (file: File): Promise<ConvertedVideo> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      img.onload = async () => {
+        try {
+          // --- 画像サイズ計算ロジック ---
+          const MAX_SIZE = 1280; // 長辺の最大値（720p〜程度）
+
+          let width = img.width;
+          let height = img.height;
+
+          // 1. 長辺をMAX_SIZEに収めるようにリサイズ計算
+          if (width > MAX_SIZE || height > MAX_SIZE) {
+            if (width > height) {
+              height = Math.round((height * MAX_SIZE) / width);
+              width = MAX_SIZE;
+            } else {
+              width = Math.round((width * MAX_SIZE) / height);
+              height = MAX_SIZE;
+            }
+          }
+
+          // 2. MP4の仕様（H.264）に合わせ、必ず偶数にする
+          width = width % 2 === 0 ? width : width - 1;
+          height = height % 2 === 0 ? height : height - 1;
+
+          // 1. Muxerの設定（MP4の箱を作る準備）
+          const muxer = new Muxer({
+            target: new ArrayBufferTarget(),
+            video: {
+              codec: 'avc', // H.264
+              width: width,
+              height: height
+            },
+            fastStart: 'in-memory' // Webでの再生をスムーズにする設定
+          });
+
+          // 2. VideoEncoderの設定（画像を動画データに圧縮）
+          const encoder = new VideoEncoder({
+            output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+            error: (e) => reject(e)
+          });
+
+          encoder.configure({
+            codec: 'avc1.640028',
+            width: width,
+            height: height,
+            bitrate: 2_000_000, // 高解像度に合わせて少しビットレートを上げると綺麗です
+            framerate: 1
+          });
+
+          // 3. Canvasからフレームを作成して送る
+          const offscreen = new OffscreenCanvas(width, height);
+          const ctx = offscreen.getContext('2d')!;
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const frame = new VideoFrame(offscreen, { timestamp: 0 });
+          encoder.encode(frame, { keyFrame: true });
+          frame.close();
+
+          // 1秒間の静止動画にするために、同じフレームを1秒後のタイムスタンプで送る
+          const frameEnd = new VideoFrame(offscreen, { timestamp: 1_000_000 }); // マイクロ秒単位
+          encoder.encode(frameEnd);
+          frameEnd.close();
+
+          // 4. 完了処理
+          await encoder.flush();
+          muxer.finalize();
+
+          const { buffer } = muxer.target as ArrayBufferTarget;
+          const blob = new Blob([buffer], { type: 'video/mp4' });
+
+          resolve({
+            id: Math.random().toString(36).substr(2, 9),
+            name: file.name.replace(/\.[^/.]+$/, "") + ".mp4",
+            url: URL.createObjectURL(blob)
+          });
+        } catch (err) {
+          reject(err);
+        }
+      };
+      img.onerror = (e) => reject(e);
+    });
   };
 
   const convertImageToVideo = (file: File): Promise<ConvertedVideo> => {
